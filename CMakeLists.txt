@@ -3,7 +3,7 @@ message(STATUS "Local .env.cmake: ${LOCAL_ENV}")
  
 cmake_minimum_required(VERSION 3.11.0)
  
-set(VulkanTest VulkanTest)
+set(PROJECT_NAME CreepyProductionEngine)
  
 message(STATUS "using ${CMAKE_GENERATOR}")
 if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
@@ -15,7 +15,7 @@ if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
     set(CMAKE_CXX_COMPILER  ${MINGW_PATH}/bin/g++.exe)
 endif()
  
-project(${VulkanTest} VERSION 0.23.0)
+project(${PROJECT_NAME} VERSION 0.23.0)
  
 # 1. Set VULKAN_SDK_PATH in .env.cmake to target specific vulkan version
 if (DEFINED VULKAN_SDK_PATH)
