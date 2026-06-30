@@ -24,7 +24,7 @@ namespace cpe {
         );
     };
     RayTracingPipeline::~RayTracingPipeline() {
-
+        vkDestroyPipeline(m_Device.device(), m_Pipeline, nullptr);
     };
 
     void RayTracingPipeline::createPipeline(
