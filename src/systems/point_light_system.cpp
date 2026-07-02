@@ -16,12 +16,21 @@ namespace cpe {
         float radius;
     };
 
-    PointLightSystem::PointLightSystem(Device& device, VkRenderPass renderPass, VkDescriptorSetLayout globalSetLayout) : m_Device{device}  {
+    PointLightSystem::PointLightSystem(Device& device, VkRenderPass renderPass, VkDescriptorSetLayout globalSetLayout) : m_Device{device}, pipelineLayout{VK_NULL_HANDLE}  {
         createPipelineLayout(globalSetLayout);
-        createPipeline(renderPass);
+        try {
+            createPipeline(renderPass);
+        } catch (...) {
+            if (pipelineLayout != VK_NULL_HANDLE) {
+                vkDestroyPipelineLayout(m_Device.device(), pipelineLayout, nullptr);
+                pipelineLayout = VK_NULL_HANDLE;
+            }
+            throw;
+        }
     };
 
     PointLightSystem::~PointLightSystem() {
+        m_Pipeline.reset();
         vkDestroyPipelineLayout(m_Device.device(), pipelineLayout, nullptr);
     };
 
@@ -81,6 +90,8 @@ namespace cpe {
 
     void PointLightSystem::render(FrameInfo &frameInfo) {
         m_Pipeline->bind(frameInfo.commandBuffer);
+
+        assert(frameInfo.globalDescriptorSet != VK_NULL_HANDLE && "global descriptor set is null");
 
         vkCmdBindDescriptorSets(
             frameInfo.commandBuffer,

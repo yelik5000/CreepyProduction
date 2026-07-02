@@ -21,6 +21,9 @@ namespace cpe {
             GLFWwindow *getGLFWwindow() const { return window; };
 
             void createWindowSurface(VkInstance instance, VkSurfaceKHR *surface);
+
+            uint32_t getWidth() { return width; };
+            uint32_t getHeight() { return height; };
         private:
             static void framebufferResizedCallback(GLFWwindow *window, int width, int height);
             void initWindow();

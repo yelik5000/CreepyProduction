@@ -5,6 +5,7 @@
 #include "game_object.hpp"
 #include "ray_tracing_pipeline.hpp"
 #include "frame_info.hpp"
+#include "shader_binding_table.hpp"
 
 #include <memory>
 #include <vector>
@@ -25,6 +26,7 @@ namespace cpe {
             void createPipeline();
             Device& m_Device;
             std::unique_ptr<RayTracingPipeline> m_Pipeline;
-            VkPipelineLayout m_Layout;
+            std::unique_ptr<ShaderBindingTable> m_ShaderBindingTable;
+            VkPipelineLayout m_Layout = VK_NULL_HANDLE;
     };
 }

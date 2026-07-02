@@ -1,10 +1,13 @@
 #include "shader_binding_table.hpp"
+
 #include <vector>
+#include <memory>
 #include <cstring>
+#include <stdexcept>
 
 namespace cpe {
-    ShaderBindingTable::ShaderBindingTable(Device &device, RayTracingPipeline &pipeline) : m_Device{device}, m_Pipeline{pipeline}{
-        createShaderBindingTable(m_Pipeline.getPipeline());
+    ShaderBindingTable::ShaderBindingTable(Device &device, RayTracingPipeline &pipeline) : m_Device{device} {
+        createShaderBindingTable(pipeline.getPipeline());
     };
     ShaderBindingTable::~ShaderBindingTable() {
         vkDestroyBuffer(m_Device.device(), sbtBuffer, nullptr);
@@ -32,10 +35,14 @@ namespace cpe {
 
         uint32_t handleSizeAlligned = allignBinding(handleSize, handleAllignment);
 
-        uint32_t groupCount = 3; //temporary hardcode
+        uint32_t groupCount = 3; // temporary hardcode
         uint32_t dataSize = groupCount * handleSize;
 
         std::vector<uint8_t> shaderHandleStorage(dataSize);
+
+        if (pfnVkGetRayTracingShaderGroupHandlesKHR == nullptr) {
+            throw std::runtime_error("vkGetRayTracingShaderGroupHandlesKHR not loaded");
+        }
 
         pfnVkGetRayTracingShaderGroupHandlesKHR(
             m_Device.device(),
@@ -47,14 +54,12 @@ namespace cpe {
         );
 
         uint32_t raygenRegionSize = allignBinding(handleSizeAlligned, baseAllignment);
-        uint32_t missRegionSize = allignBinding(1 * handleSizeAlligned, baseAllignment); // temporary hardcode
-        uint32_t hitRegionSize = allignBinding(1 * handleSizeAlligned, baseAllignment);
-        uint32_t callableRegionSize = allignBinding(0 * handleSizeAlligned, baseAllignment);
+        uint32_t missRegionSize = allignBinding(handleSizeAlligned, baseAllignment);
+        uint32_t hitRegionSize = allignBinding(handleSizeAlligned, baseAllignment);
+        uint32_t callableRegionSize = 0;
 
         VkDeviceSize sbtBufferSize = raygenRegionSize + missRegionSize + hitRegionSize + callableRegionSize;
 
-        VkBuffer sbtBuffer;
-        VkDeviceMemory sbtBufferMemory;
         m_Device.createBuffer(
             sbtBufferSize,
             VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,

@@ -25,6 +25,6 @@ namespace cpe {
             void createPipeline(VkRenderPass renderPass);
             Device& m_Device;
             std::unique_ptr<Pipeline> m_Pipeline;
-            VkPipelineLayout pipelineLayout;
+            VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     };
 }

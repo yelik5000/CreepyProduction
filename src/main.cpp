@@ -7,12 +7,16 @@
 int main() {
     cpe::FirstApp app{};
     try {
-        app.run();
+        app.runRayTracer();
+    } catch(const std::exception &err) {
+        std::cerr << "Ray tracer failed: " << err.what() << '\n';
+        try {
+            app.runRasterizer();
+        } catch (const std::exception &e) {
+            std::cerr << e.what() << '\n';
+            return EXIT_FAILURE;
+        };
     }
-    catch (const std::exception &e) {
-        std::cerr << e.what() << '\n';
-        return EXIT_FAILURE;
-    };
 
     return EXIT_SUCCESS;
 }

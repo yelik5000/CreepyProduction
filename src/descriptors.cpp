@@ -3,6 +3,7 @@
 // std
 #include <cassert>
 #include <stdexcept>
+#include <string>
  
 namespace cpe {
  
@@ -112,8 +113,9 @@ bool DescriptorPool::allocateDescriptor(
  
   // Might want to create a "DescriptorPoolManager" class that handles this case, and builds
   // a new pool whenever an old pool fills up. But this is beyond our current scope
-  if (vkAllocateDescriptorSets(m_Device.device(), &allocInfo, &descriptor) != VK_SUCCESS) {
-    return false;
+  VkResult result = vkAllocateDescriptorSets(m_Device.device(), &allocInfo, &descriptor);
+  if (result != VK_SUCCESS) {
+    throw std::runtime_error("vkAllocateDescriptorSets failed: " + std::to_string(result));
   }
   return true;
 }

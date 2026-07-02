@@ -29,5 +29,7 @@ namespace cpe {
         Camera &camera;
         VkDescriptorSet globalDescriptorSet;
         GameObject::Map &gameObjects;
+        uint32_t width;
+        uint32_t height;
     };
 }

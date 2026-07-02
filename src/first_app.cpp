@@ -3,8 +3,10 @@
 #include "keyboard_movement_controller.hpp"
 #include "camera.hpp"
 #include "buffer.hpp"
+#include "shader_binding_table.hpp"
 #include "systems/simple_render_system.hpp"
 #include "systems/point_light_system.hpp"
+#include "systems/ray_tracing_system.hpp"
 
 #define GLM_FORCE_RADIANS
 #define GLM_FROCE_DEPTH_ZERO_TO_ONE
@@ -22,8 +24,8 @@
 namespace cpe {
     FirstApp::FirstApp() {
         globalPool = DescriptorPool::Builder(m_Device)
-            .setMaxSets(SwapChain::MAX_FRAMES_IN_FLIGHT)
-            .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT)
+            .setMaxSets(SwapChain::MAX_FRAMES_IN_FLIGHT * 10)
+            .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, SwapChain::MAX_FRAMES_IN_FLIGHT * 10)
             .build();
         loadGameObjects();
     };
@@ -32,7 +34,7 @@ namespace cpe {
         cleanupAccelerationStructures();
     };
 
-    void FirstApp::run() {
+    void FirstApp::runRasterizer() {
         std::vector<std::unique_ptr<Buffer>> uboBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT);
         for(int i = 0; i < uboBuffers.size(); i ++) {
             uboBuffers[i] = std::make_unique<Buffer>(
@@ -54,9 +56,11 @@ namespace cpe {
 
         for(int i = 0; i < globalDescriptorSets.size(); i ++) {
             auto bufferInfo = uboBuffers[i]->descriptorInfo();
-            DescriptorWriter(*globalSetLayout, *globalPool)
-                .writeBuffer(0, &bufferInfo)
-                .build(globalDescriptorSets[i]);
+            if (!DescriptorWriter(*globalSetLayout, *globalPool)
+                    .writeBuffer(0, &bufferInfo)
+                    .build(globalDescriptorSets[i])) {
+                throw std::runtime_error("failed to allocate global descriptor set");
+            }
         };
 
         SimpleRenderSystem simpleRenderSystem{
@@ -78,7 +82,6 @@ namespace cpe {
         auto currentTime = std::chrono::high_resolution_clock::now();
 
         while(!m_Window.shouldClose()) {
-            static int i = 0;
             glfwPollEvents();
 
             auto newTime = std::chrono::high_resolution_clock::now();
@@ -112,21 +115,116 @@ namespace cpe {
                 uboBuffers[frameIndex]->writeToBuffer(&ubo);
                 uboBuffers[frameIndex]->flush();
 
-                if(i == 0) for(auto &kv : gameObjects) {
-                    GameObject &gameObject = kv.second;
-                    buildBLAS(gameObject, commandBuffer);
-                };
                 m_Renderer.beginSwapChainRenderpass(commandBuffer);
                 simpleRenderSystem.renderGameObjects(frameInfo);
                 pointLightSystem.render(frameInfo);
                 m_Renderer.endSwapChainRenderpass(commandBuffer);
                 m_Renderer.endFrame();
             };
-            i ++;
         };
         cleanupAccelerationStructures();
         vkDeviceWaitIdle(m_Device.device());
     };
+    void FirstApp::runRayTracer() {
+        std::vector<std::unique_ptr<Buffer>> uboBuffers(SwapChain::MAX_FRAMES_IN_FLIGHT);
+        for(int i = 0; i < uboBuffers.size(); i ++) {
+            uboBuffers[i] = std::make_unique<Buffer>(
+                m_Device,
+                sizeof(GlobalUbo),
+                1,
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+                m_Device.properties.limits.minUniformBufferOffsetAlignment
+            );
+            uboBuffers[i]->map();
+        };
+
+        auto globalSetLayout = DescriptorSetLayout::Builder(m_Device)
+            .addBinding(
+                0,
+                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+                    VK_SHADER_STAGE_MISS_BIT_KHR |
+                    VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
+            )
+            .build();
+
+        std::vector<VkDescriptorSet> globalDescriptorSets(SwapChain::MAX_FRAMES_IN_FLIGHT);
+
+        for(int i = 0; i < globalDescriptorSets.size(); i ++) {
+            auto bufferInfo = uboBuffers[i]->descriptorInfo();
+            if (!DescriptorWriter(*globalSetLayout, *globalPool)
+                    .writeBuffer(0, &bufferInfo)
+                    .build(globalDescriptorSets[i])) {
+                throw std::runtime_error("failed to allocate global descriptor set");
+            }
+        };
+
+        RayTracingSystem rayTracingSystem{
+            m_Device,
+            globalSetLayout->getDescriptorSetLayout()
+        };
+
+        Camera camera{};
+
+        auto viewerObject = GameObject::createGameObject();
+        viewerObject.transform.translation.z = -2.5f;
+        KeyboardMovementController cameraController{};
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+
+        if(!m_Window.shouldClose()) { // Set-up frame
+            glfwPollEvents();
+
+            if(auto commandBuffer = m_Renderer.beginFrame()) {
+                for(auto &kv : gameObjects) {
+                    GameObject &gameObject = kv.second;
+                    buildBLAS(gameObject, commandBuffer);
+                };
+                buildTLAS(commandBuffer);
+
+                m_Renderer.endFrame();
+            }
+        };
+
+        while(!m_Window.shouldClose()) {
+            glfwPollEvents();
+
+            auto newTime = std::chrono::high_resolution_clock::now();
+            float frameTime = std::chrono::duration<float, std::chrono::seconds::period>(newTime - currentTime).count();
+            currentTime = newTime;
+
+            frameTime = glm::min(frameTime, MAX_FRAME_TIME);
+
+            cameraController.moveInPlaneXZ(m_Window.getGLFWwindow(), frameTime, viewerObject);
+            camera.setViewYXZ(viewerObject.transform.translation, viewerObject.transform.rotation);
+
+            float aspect = m_Renderer.getAspectRatio();
+            camera.setPerspectiveProjection(glm::radians(50.f), aspect, .1f, 100.f);
+
+            if(auto commandBuffer = m_Renderer.beginFrame()) {
+                int frameIndex = m_Renderer.getFrameIndex();
+                FrameInfo frameInfo{
+                    frameIndex,
+                    frameTime,
+                    commandBuffer,
+                    camera,
+                    globalDescriptorSets[frameIndex],
+                    gameObjects,
+                    m_Window.getWidth(),
+                    m_Window.getHeight()
+                };
+
+                rayTracingSystem.renderGameObjects(frameInfo);
+                
+
+                m_Renderer.endFrame();
+            };
+        };
+        cleanupAccelerationStructures();
+        vkDeviceWaitIdle(m_Device.device());
+    };
+
 
     void FirstApp::cleanupAccelerationStructures() {
         PFN_vkDestroyAccelerationStructureKHR pfnVkDestroyAccelerationStructureKHR =

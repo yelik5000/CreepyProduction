@@ -1,7 +1,9 @@
 #include "ray_tracing_system.hpp"
 
+#include "shader_binding_table.hpp"
+
 #define GLM_FORCE_RADIANS
-#define GLM_FROCE_DEPTH_ZERO_TO_ONE
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "glm/glm.hpp"
 #include <glm/gtc/constants.hpp>
 
@@ -15,18 +17,32 @@ namespace cpe {
         glm::mat4 normalMatrix{1.f};
     };
 
-    RayTracingSystem::RayTracingSystem(Device& device, VkDescriptorSetLayout globalSetLayout) : m_Device{device}  {
+    RayTracingSystem::RayTracingSystem(Device& device, VkDescriptorSetLayout globalSetLayout) : m_Device{device}, m_Layout{VK_NULL_HANDLE} {
         createPipelineLayout(globalSetLayout);
-        createPipeline();
+        try {
+            createPipeline();
+            m_ShaderBindingTable = std::make_unique<ShaderBindingTable>(m_Device, *m_Pipeline);
+        } catch (...) {
+            if (m_Layout != VK_NULL_HANDLE) {
+                vkDestroyPipelineLayout(m_Device.device(), m_Layout, nullptr);
+                m_Layout = VK_NULL_HANDLE;
+            }
+            throw;
+        }
     };
 
     RayTracingSystem::~RayTracingSystem() {
+        m_Pipeline.reset();
+        m_ShaderBindingTable.reset();
         vkDestroyPipelineLayout(m_Device.device(), m_Layout, nullptr);
     };
 
     void RayTracingSystem::createPipelineLayout(VkDescriptorSetLayout globalSetLayout) {
         VkPushConstantRange pushConstantRange{};
-        pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        pushConstantRange.stageFlags =
+            VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+            VK_SHADER_STAGE_MISS_BIT_KHR |
+            VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
         pushConstantRange.offset = 0;
         pushConstantRange.size = sizeof(SimplePushConstantData);
 
@@ -67,6 +83,8 @@ namespace cpe {
     void RayTracingSystem::renderGameObjects(FrameInfo &frameInfo) {
         m_Pipeline->bind(frameInfo.commandBuffer);
 
+        assert(frameInfo.globalDescriptorSet != VK_NULL_HANDLE && "global descriptor set is null");
+
         vkCmdBindDescriptorSets(
             frameInfo.commandBuffer,
             VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
@@ -75,7 +93,18 @@ namespace cpe {
             &frameInfo.globalDescriptorSet,
             0, nullptr
         );
-        
-        
+
+        //vkCmdTraceRaysKHR(
+        //    frameInfo.commandBuffer,
+        //    &m_ShaderBindingTable->getRaygenRegion(),
+        //    &m_ShaderBindingTable->getMissRegion(),
+        //    &m_ShaderBindingTable->getHitRegion(),
+        //    &m_ShaderBindingTable->getCallableRegion(),
+        //    frameInfo.width,
+        //    frameInfo.height,
+        //    1                   // temporary hardcode
+        //);
+
+        // Not tracing right now, since there are no shaders
     };
 }

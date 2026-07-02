@@ -43,8 +43,9 @@ namespace cpe {
 
         createShaderModule(rgenShaderCode, &rgenModule);
         createShaderModule(missShaderCode, &missModule);
+        createShaderModule(chitShaderCode, &chitModule);
 
-        std::vector<VkPipelineShaderStageCreateInfo> shaderStages{3};
+        std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
 
         VkPipelineShaderStageCreateInfo shaderStage{};
         shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -53,19 +54,21 @@ namespace cpe {
         shaderStage.pName = "main";
         shaderStages.emplace_back(shaderStage);
 
+        shaderStage = {};
         shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         shaderStage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
         shaderStage.module = missModule;
         shaderStage.pName = "main";
         shaderStages.emplace_back(shaderStage);
 
+        shaderStage = {};
         shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         shaderStage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
         shaderStage.module = chitModule;
         shaderStage.pName = "main";
         shaderStages.emplace_back(shaderStage);
 
-        std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups{3};
+        std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups;
         VkRayTracingShaderGroupCreateInfoKHR shaderGroup{};
 
         shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
@@ -76,6 +79,7 @@ namespace cpe {
         shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
         shaderGroups.emplace_back(shaderGroup);
 
+        shaderGroup = {};
         shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
         shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
         shaderGroup.generalShader = 1; // the second index
@@ -84,11 +88,12 @@ namespace cpe {
         shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
         shaderGroups.emplace_back(shaderGroup);
         
+        shaderGroup = {};
         shaderGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
         shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
-        shaderGroup.generalShader = 0; // the first index
+        shaderGroup.generalShader = VK_SHADER_UNUSED_KHR;
         shaderGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
-        shaderGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
+        shaderGroup.closestHitShader = 2; // the third index
         shaderGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
         shaderGroups.emplace_back(shaderGroup);
 

@@ -15,12 +15,21 @@ namespace cpe {
         glm::mat4 normalMatrix{1.f};
     };
 
-    SimpleRenderSystem::SimpleRenderSystem(Device& device, VkRenderPass renderPass, VkDescriptorSetLayout globalSetLayout) : m_Device{device}  {
+    SimpleRenderSystem::SimpleRenderSystem(Device& device, VkRenderPass renderPass, VkDescriptorSetLayout globalSetLayout) : m_Device{device}, pipelineLayout{VK_NULL_HANDLE}  {
         createPipelineLayout(globalSetLayout);
-        createPipeline(renderPass);
+        try {
+            createPipeline(renderPass);
+        } catch (...) {
+            if (pipelineLayout != VK_NULL_HANDLE) {
+                vkDestroyPipelineLayout(m_Device.device(), pipelineLayout, nullptr);
+                pipelineLayout = VK_NULL_HANDLE;
+            }
+            throw;
+        }
     };
 
     SimpleRenderSystem::~SimpleRenderSystem() {
+        m_Pipeline.reset();
         vkDestroyPipelineLayout(m_Device.device(), pipelineLayout, nullptr);
     };
 
@@ -65,6 +74,8 @@ namespace cpe {
 
     void SimpleRenderSystem::renderGameObjects(FrameInfo &frameInfo) {
         m_Pipeline->bind(frameInfo.commandBuffer);
+
+        assert(frameInfo.globalDescriptorSet != VK_NULL_HANDLE && "global descriptor set is null");
 
         vkCmdBindDescriptorSets(
             frameInfo.commandBuffer,

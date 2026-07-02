@@ -26,7 +26,6 @@ namespace cpe {
             };
 
             Device &m_Device;
-            RayTracingPipeline &m_Pipeline;
             VkBuffer sbtBuffer;
             VkDeviceMemory sbtBufferMemory;
 
